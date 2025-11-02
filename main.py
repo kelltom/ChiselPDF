@@ -1,13 +1,18 @@
 import os
-import tkinter as tk
-from tkinter import filedialog, messagebox, ttk
+import sys
 from pathlib import Path
+
+from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
+                             QHBoxLayout, QLabel, QPushButton, QLineEdit, 
+                             QFileDialog, QMessageBox, QGroupBox)
+from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QFont
+
 try:
     from PyPDF2 import PdfReader, PdfWriter
 except ImportError:
     print("PyPDF2 library is required. Installing...")
     import subprocess
-    import sys
     subprocess.check_call([sys.executable, "-m", "pip", "install", "PyPDF2"])
     from PyPDF2 import PdfReader, PdfWriter
 
@@ -90,184 +95,284 @@ def trim_pdf(input_path, page_numbers, output_path):
         return False, f"Error processing PDF: {str(e)}", []
 
 
-class PDFPageSelectorApp:
-    def __init__(self, root):
-        self.root = root
-        self.root.title("PDF Page Selector")
-        self.root.geometry("600x400")
-        self.root.resizable(True, True)
-        
+class PDFPageSelectorApp(QMainWindow):
+    def __init__(self):
+        super().__init__()
         self.input_path = None
+        self.output_path = None
         self.total_pages = 0
         
-        self.create_widgets()
+        self.init_ui()
         
-    def create_widgets(self):
-        # Main frame with padding
-        main_frame = ttk.Frame(self.root, padding="20")
-        main_frame.grid(row=0, column=0, sticky="nsew")
+    def init_ui(self):
+        self.setWindowTitle("PDF Page Selector")
+        self.setMinimumSize(400, 500)
+        self.resize(400, 500)
         
-        self.root.columnconfigure(0, weight=1)
-        self.root.rowconfigure(0, weight=1)
-        main_frame.columnconfigure(1, weight=1)
+        # Set application style
+        self.setStyleSheet("""
+            QMainWindow, QWidget {
+                background-color: #2b2b2b;
+                color: #ffffff;
+            }
+            QGroupBox {
+                border: 1px solid #555555;
+                border-radius: 5px;
+                margin-top: 10px;
+                padding-top: 10px;
+                font-weight: bold;
+            }
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                left: 10px;
+                padding: 0 5px;
+            }
+            QLabel {
+                color: #ffffff;
+            }
+            QLineEdit {
+                background-color: #3c3c3c;
+                color: #ffffff;
+                border: 1px solid #555555;
+                border-radius: 3px;
+                padding: 5px;
+            }
+            QPushButton {
+                background-color: #0d47a1;
+                color: #ffffff;
+                border: none;
+                border-radius: 3px;
+                padding: 8px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #1565c0;
+            }
+            QPushButton:pressed {
+                background-color: #0a3d91;
+            }
+            QPushButton:disabled {
+                background-color: #555555;
+                color: #888888;
+            }
+        """)
+        
+        # Central widget and main layout
+        central_widget = QWidget()
+        self.setCentralWidget(central_widget)
+        main_layout = QVBoxLayout(central_widget)
+        main_layout.setContentsMargins(20, 20, 20, 20)
+        main_layout.setSpacing(15)
         
         # Title
-        title_label = ttk.Label(main_frame, text="PDF Page Selector", 
-                                font=("Arial", 16, "bold"))
-        title_label.grid(row=0, column=0, columnspan=3, pady=(0, 20))
+        title_label = QLabel("PDF Page Selector")
+        title_font = QFont()
+        title_font.setPointSize(18)
+        title_font.setBold(True)
+        title_label.setFont(title_font)
+        title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        main_layout.addWidget(title_label)
         
-        # Input PDF section
-        ttk.Label(main_frame, text="Input PDF:").grid(row=1, column=0, sticky=tk.W, pady=5)
+        main_layout.addSpacing(10)
         
-        self.input_label = ttk.Label(main_frame, text="No file selected", 
-                                     foreground="gray", relief="sunken", padding=5)
-        self.input_label.grid(row=1, column=1, sticky="ew", padx=5, pady=5)
+        # Input PDF group
+        input_group = QGroupBox("Input PDF")
+        input_layout = QVBoxLayout()
+        input_layout.setSpacing(8)
         
-        ttk.Button(main_frame, text="Browse...", 
-                  command=self.browse_input).grid(row=1, column=2, pady=5)
+        input_button_layout = QHBoxLayout()
+        self.input_label = QLabel("No file selected")
+        self.input_label.setStyleSheet("color: #888888; padding: 5px;")
+        self.input_label.setWordWrap(True)
+        input_button_layout.addWidget(self.input_label, 1)
         
-        # Page info label
-        self.page_info_label = ttk.Label(main_frame, text="", foreground="blue")
-        self.page_info_label.grid(row=2, column=1, sticky=tk.W, padx=5)
+        input_browse_btn = QPushButton("Browse...")
+        input_browse_btn.setFixedWidth(100)
+        input_browse_btn.clicked.connect(self.browse_input)
+        input_button_layout.addWidget(input_browse_btn)
         
-        # Page ranges section
-        ttk.Label(main_frame, text="Page Ranges:").grid(row=3, column=0, sticky=tk.W, pady=5)
+        input_layout.addLayout(input_button_layout)
         
-        self.page_entry = ttk.Entry(main_frame, width=40)
-        self.page_entry.grid(row=3, column=1, sticky="ew", padx=5, pady=5)
+        self.page_info_label = QLabel("")
+        self.page_info_label.setStyleSheet("color: #aaaaaa; font-size: 10pt;")
+        input_layout.addWidget(self.page_info_label)
         
-        # Help text
-        help_frame = ttk.Frame(main_frame)
-        help_frame.grid(row=4, column=1, sticky="ew", padx=5, pady=5)
+        input_group.setLayout(input_layout)
+        main_layout.addWidget(input_group)
         
-        help_text = ttk.Label(help_frame, 
-                             text="Examples: 1-3,5,6-9,11  or  1,3,5  or  10-20",
-                             foreground="gray", font=("Arial", 9))
-        help_text.pack(anchor=tk.W)
+        # Page ranges group
+        page_group = QGroupBox("Page Ranges")
+        page_layout = QVBoxLayout()
+        page_layout.setSpacing(8)
         
-        # Output section
-        ttk.Label(main_frame, text="Output PDF:").grid(row=5, column=0, sticky=tk.W, pady=5)
+        self.page_entry = QLineEdit()
+        self.page_entry.setPlaceholderText("e.g., 1-3,5,6-9,11")
+        page_layout.addWidget(self.page_entry)
         
-        self.output_label = ttk.Label(main_frame, text="No output location selected", 
-                                      foreground="gray", relief="sunken", padding=5)
-        self.output_label.grid(row=5, column=1, sticky="ew", padx=5, pady=5)
+        help_label = QLabel("Examples: 1-3,5,6-9,11  or  1,3,5  or  10-20")
+        help_label.setStyleSheet("color: #aaaaaa; font-size: 9pt;")
+        page_layout.addWidget(help_label)
         
-        ttk.Button(main_frame, text="Browse...", 
-                  command=self.browse_output).grid(row=5, column=2, pady=5)
+        page_group.setLayout(page_layout)
+        main_layout.addWidget(page_group)
+        
+        # Output PDF group
+        output_group = QGroupBox("Output PDF")
+        output_layout = QVBoxLayout()
+        output_layout.setSpacing(8)
+        
+        output_button_layout = QHBoxLayout()
+        self.output_label = QLabel("No output location selected")
+        self.output_label.setStyleSheet("color: #888888; padding: 5px;")
+        self.output_label.setWordWrap(True)
+        output_button_layout.addWidget(self.output_label, 1)
+        
+        output_browse_btn = QPushButton("Browse...")
+        output_browse_btn.setFixedWidth(100)
+        output_browse_btn.clicked.connect(self.browse_output)
+        output_button_layout.addWidget(output_browse_btn)
+        
+        output_layout.addLayout(output_button_layout)
+        output_group.setLayout(output_layout)
+        main_layout.addWidget(output_group)
         
         # Process button
-        self.process_button = ttk.Button(main_frame, text="Create Trimmed PDF", 
-                                        command=self.process_pdf, state=tk.DISABLED)
-        self.process_button.grid(row=6, column=0, columnspan=3, pady=20)
+        self.process_button = QPushButton("Create Trimmed PDF")
+        self.process_button.setMinimumHeight(40)
+        process_font = QFont()
+        process_font.setPointSize(11)
+        process_font.setBold(True)
+        self.process_button.setFont(process_font)
+        self.process_button.clicked.connect(self.process_pdf)
+        self.process_button.setEnabled(False)
+        main_layout.addWidget(self.process_button)
         
         # Status label
-        self.status_label = ttk.Label(main_frame, text="", wraplength=550)
-        self.status_label.grid(row=7, column=0, columnspan=3, pady=10)
+        self.status_label = QLabel("")
+        self.status_label.setWordWrap(True)
+        self.status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        main_layout.addWidget(self.status_label)
+        
+        # Add stretch to push everything to the top
+        main_layout.addStretch()
         
     def browse_input(self):
-        filename = filedialog.askopenfilename(
-            title="Select Input PDF",
-            filetypes=[("PDF files", "*.pdf"), ("All files", "*.*")]
+        filename, _ = QFileDialog.getOpenFileName(
+            self,
+            "Select Input PDF",
+            "",
+            "PDF files (*.pdf);;All files (*.*)"
         )
         
         if filename:
             self.input_path = filename
             # Truncate long paths for display
-            display_name = filename if len(filename) < 60 else "..." + filename[-57:]
-            self.input_label.config(text=display_name, foreground="black")
+            display_name = filename if len(filename) < 80 else "..." + filename[-77:]
+            self.input_label.setText(display_name)
+            self.input_label.setStyleSheet("color: #ffffff; padding: 5px;")
             
             # Get page count
             try:
                 reader = PdfReader(filename)
                 self.total_pages = len(reader.pages)
-                self.page_info_label.config(text=f"(Total pages: {self.total_pages})")
+                self.page_info_label.setText(f"Total pages: {self.total_pages}")
                 
                 # Suggest default output
                 input_file = Path(filename)
                 default_output = input_file.parent / f"{input_file.stem}_trimmed{input_file.suffix}"
                 self.output_path = str(default_output)
-                display_output = str(default_output) if len(str(default_output)) < 60 else "..." + str(default_output)[-57:]
-                self.output_label.config(text=display_output, foreground="black")
+                display_output = str(default_output) if len(str(default_output)) < 80 else "..." + str(default_output)[-77:]
+                self.output_label.setText(display_output)
+                self.output_label.setStyleSheet("color: #ffffff; padding: 5px;")
                 
                 self.update_process_button()
             except Exception as e:
-                messagebox.showerror("Error", f"Could not read PDF: {str(e)}")
+                QMessageBox.critical(self, "Error", f"Could not read PDF: {str(e)}")
                 self.input_path = None
                 self.total_pages = 0
-                self.input_label.config(text="No file selected", foreground="gray")
-                self.page_info_label.config(text="")
+                self.input_label.setText("No file selected")
+                self.input_label.setStyleSheet("color: #888888; padding: 5px;")
+                self.page_info_label.setText("")
     
     def browse_output(self):
         if self.input_path:
             input_file = Path(self.input_path)
             initial_file = f"{input_file.stem}_trimmed{input_file.suffix}"
-            initial_dir = input_file.parent
+            initial_dir = str(input_file.parent)
         else:
             initial_file = "output_trimmed.pdf"
-            initial_dir = Path.home()
+            initial_dir = str(Path.home())
         
-        filename = filedialog.asksaveasfilename(
-            title="Save Trimmed PDF As",
-            initialfile=initial_file,
-            initialdir=initial_dir,
-            defaultextension=".pdf",
-            filetypes=[("PDF files", "*.pdf"), ("All files", "*.*")]
+        filename, _ = QFileDialog.getSaveFileName(
+            self,
+            "Save Trimmed PDF As",
+            f"{initial_dir}/{initial_file}",
+            "PDF files (*.pdf);;All files (*.*)"
         )
         
         if filename:
             self.output_path = filename
-            display_name = filename if len(filename) < 60 else "..." + filename[-57:]
-            self.output_label.config(text=display_name, foreground="black")
+            display_name = filename if len(filename) < 80 else "..." + filename[-77:]
+            self.output_label.setText(display_name)
+            self.output_label.setStyleSheet("color: #ffffff; padding: 5px;")
             self.update_process_button()
     
     def update_process_button(self):
-        if self.input_path and hasattr(self, 'output_path'):
-            self.process_button.config(state=tk.NORMAL)
+        if self.input_path and self.output_path:
+            self.process_button.setEnabled(True)
         else:
-            self.process_button.config(state=tk.DISABLED)
+            self.process_button.setEnabled(False)
     
     def process_pdf(self):
         # Validate page input
-        page_input = self.page_entry.get().strip()
+        page_input = self.page_entry.text().strip()
         if not page_input:
-            messagebox.showerror("Error", "Please enter page ranges.")
+            QMessageBox.warning(self, "Error", "Please enter page ranges.")
             return
         
         try:
             page_numbers = parse_page_ranges(page_input)
         except ValueError as e:
-            messagebox.showerror("Error", f"Invalid page format:\n{str(e)}")
+            QMessageBox.warning(self, "Error", f"Invalid page format:\n{str(e)}")
             return
         
         if not page_numbers:
-            messagebox.showerror("Error", "No valid page numbers found.")
+            QMessageBox.warning(self, "Error", "No valid page numbers found.")
             return
         
         # Check if output file exists
-        if os.path.exists(self.output_path):
-            if not messagebox.askyesno("Confirm Overwrite", 
-                                       f"File already exists:\n{self.output_path}\n\nOverwrite?"):
+        if self.output_path and os.path.exists(self.output_path):
+            reply = QMessageBox.question(
+                self,
+                "Confirm Overwrite",
+                f"File already exists:\n{self.output_path}\n\nOverwrite?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+            )
+            if reply == QMessageBox.StandardButton.No:
                 return
         
         # Process the PDF
-        self.status_label.config(text="Processing...", foreground="blue")
-        self.root.update()
+        self.status_label.setText("Processing...")
+        self.status_label.setStyleSheet("color: #aaaaaa;")
+        QApplication.processEvents()  # Update UI
         
         success, message, valid_pages = trim_pdf(self.input_path, page_numbers, self.output_path)
         
         if success:
-            self.status_label.config(text=f"Success! Saved to:\n{self.output_path}", 
-                                   foreground="green")
-            messagebox.showinfo("Success", message)
+            self.status_label.setText(f"Success! Saved to: {self.output_path}")
+            self.status_label.setStyleSheet("color: #4caf50;")
+            QMessageBox.information(self, "Success", message)
         else:
-            self.status_label.config(text="Failed", foreground="red")
-            messagebox.showerror("Error", message)
+            self.status_label.setText("Failed")
+            self.status_label.setStyleSheet("color: #f44336;")
+            QMessageBox.critical(self, "Error", message)
 
 
 def main():
-    root = tk.Tk()
-    app = PDFPageSelectorApp(root)
-    root.mainloop()
+    app = QApplication(sys.argv)
+    window = PDFPageSelectorApp()
+    window.show()
+    sys.exit(app.exec())
 
 
 if __name__ == "__main__":
