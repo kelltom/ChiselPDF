@@ -25,10 +25,18 @@ class Mode:
         self.output_suffix = output_suffix
 
 
+def resource_path(relative_path):
+    """ Get absolute path to resource, works for dev and for PyInstaller """
+    # PyInstaller creates a temp folder and stores path in _MEIPASS
+    base_path = getattr(sys, '_MEIPASS', os.path.abspath("."))
+    return os.path.join(base_path, relative_path)
+
+
 def load_stylesheet():
     """Load the QSS stylesheet from a file."""
     try:
-        with open("style.qss", "r") as f:
+        stylesheet_path = resource_path("style.qss")
+        with open(stylesheet_path, "r") as f:
             return f.read()
     except FileNotFoundError:
         print("Warning: style.qss not found. Using default styles.")
