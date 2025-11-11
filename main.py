@@ -424,6 +424,7 @@ class PDFPageSelectorApp(QMainWindow):
     
     def _process_selection(self, page_input):
         """Process PDF in selection mode."""
+        self._ensure_output_path()
         try:
             page_numbers = parse_page_ranges(page_input)
         except (ValueError, AttributeError) as e:
@@ -438,6 +439,7 @@ class PDFPageSelectorApp(QMainWindow):
     
     def _process_split(self, chunk_input):
         """Process PDF in split mode."""
+        self._ensure_output_path()
         try:
             chunk_size = int(chunk_input)
             if chunk_size <= 0:
@@ -475,6 +477,21 @@ class PDFPageSelectorApp(QMainWindow):
         self.status_label.setText(f"Success! Saved to: {output_dir}")
         self.status_label.setStyleSheet("color: #4caf50;")
         QMessageBox.information(self, "Success", message)
+
+    def _ensure_output_path(self):
+        """Validate the output path before writing files."""
+        if not self.output_path:
+            raise ValueError("Please choose an output location before processing.")
+
+        if not self.input_path:
+            return
+
+        input_path = Path(self.input_path).resolve()
+        output_path = Path(self.output_path).resolve()
+
+        # Prevent overwriting the source file, which can corrupt the PDF while reading.
+        if input_path == output_path:
+            raise ValueError("Output file must be different from the input file.")
 
 
 if __name__ == "__main__":
