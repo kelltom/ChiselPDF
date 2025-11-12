@@ -9,6 +9,7 @@ from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont
 from PyPDF2 import PdfReader, PdfWriter
+from pdf2image import convert_from_path
 
 
 class Mode:
@@ -130,6 +131,61 @@ def split_pdf(input_path, chunk_size, output_path):
     return message
 
 
+def convert_to_images(input_path, page_numbers, output_path):
+    """Convert specified PDF pages to images."""
+    reader = PdfReader(input_path)
+    total_pages = len(reader.pages)
+    
+    valid_pages = []
+    invalid_pages = []
+    
+    # Validate page numbers
+    for page_num in page_numbers:
+        if 1 <= page_num <= total_pages:
+            valid_pages.append(page_num)
+        else:
+            invalid_pages.append(page_num)
+    
+    if not valid_pages:
+        raise ValueError("No valid pages to convert to images.")
+    
+    # Determine output naming
+    output_file = Path(output_path)
+    base_name = output_file.stem
+    output_dir = output_file.parent
+    
+    # Ensure output directory exists
+    output_dir.mkdir(parents=True, exist_ok=True)
+    
+    created_files = []
+    
+    # Convert pages to images
+    # pdf2image uses 1-based indexing, matching our page_numbers
+    images = convert_from_path(input_path, first_page=min(valid_pages), 
+                               last_page=max(valid_pages))
+    
+    for page_num in valid_pages:
+        # Get the corresponding image from the converted range
+        image_index = page_num - min(valid_pages)
+        if image_index < len(images):
+            image = images[image_index]
+            
+            # Generate output filename
+            output_filename = output_dir / f"{base_name}_page{page_num}.png"
+            image.save(str(output_filename), "PNG")
+            created_files.append(str(output_filename))
+    
+    num_images = len(created_files)
+    message = f"Successfully converted {num_images} page{'s' if num_images > 1 else ''} to image{'s' if num_images > 1 else ''}"
+    
+    if invalid_pages:
+        message += f"\n\nSkipped invalid pages: {invalid_pages} (PDF has {total_pages} pages)"
+    
+    message += f"\n\nCreated {num_images} PNG image{'s' if num_images > 1 else ''} in:\n{output_dir}"
+    
+    return message
+
+
 class PDFPageSelectorApp(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -155,6 +211,15 @@ class PDFPageSelectorApp(QMainWindow):
                 help_text="Number of pages per file (greater than 0)",
                 process_func=self._process_split,
                 output_suffix="_split"
+            ),
+            Mode(
+                name="image",
+                display_name="Image",
+                section_title="Page Ranges",
+                placeholder="e.g., 1-3,5,6-9,11",
+                help_text="Examples: 1-3,5,6-9,11  or  1,3,5  or  10-20",
+                process_func=self._process_image,
+                output_suffix="_images"
             )
         ]
         
@@ -196,7 +261,7 @@ class PDFPageSelectorApp(QMainWindow):
         layout.addWidget(self._create_output_section())
         
         # Process button
-        self.process_button = QPushButton("Create Trimmed PDF")
+        self.process_button = QPushButton("Execute")
         self.process_button.setMinimumHeight(40)
         self.process_button.setFont(QFont("", 11, QFont.Weight.Bold))
         self.process_button.clicked.connect(self.process_pdf)
@@ -419,6 +484,35 @@ class PDFPageSelectorApp(QMainWindow):
                     return
         
         message = split_pdf(self.input_path, chunk_size, self.output_path)
+        self._show_success(message)
+    
+    def _process_image(self, page_input):
+        """Process PDF in image mode."""
+        self._ensure_output_path()
+        try:
+            page_numbers = parse_page_ranges(page_input)
+        except (ValueError, AttributeError) as e:
+            raise ValueError(f"Invalid page format:\n{str(e)}")
+        
+        # Check if any output files would be overwritten
+        if self.output_path:
+            output_file = Path(self.output_path)
+            base_name = output_file.stem
+            output_dir = output_file.parent
+            
+            # Check if any of the image files exist
+            files_exist = False
+            for page_num in page_numbers:
+                image_file = output_dir / f"{base_name}_page{page_num}.png"
+                if image_file.exists():
+                    files_exist = True
+                    break
+            
+            if files_exist:
+                if not self._confirm_overwrite():
+                    return
+        
+        message = convert_to_images(self.input_path, page_numbers, self.output_path)
         self._show_success(message)
     
     def _confirm_overwrite(self):
