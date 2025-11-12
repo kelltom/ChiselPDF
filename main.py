@@ -16,13 +16,15 @@ class Mode:
     """Represents a PDF processing mode with all associated metadata."""
     
     def __init__(self, name, display_name, section_title, placeholder, help_text, 
-                 process_func, output_suffix):
+                 core_func, parse_input_func, check_overwrite_func, output_suffix):
         self.name = name
         self.display_name = display_name
         self.section_title = section_title
         self.placeholder = placeholder
         self.help_text = help_text
-        self.process_func = process_func
+        self.core_func = core_func  # The actual PDF manipulation function
+        self.parse_input_func = parse_input_func  # Function to parse/validate user input
+        self.check_overwrite_func = check_overwrite_func  # Function to check if files exist
         self.output_suffix = output_suffix
 
 
@@ -62,6 +64,59 @@ def parse_page_ranges(page_input):
             pages.add(int(part))
     
     return sorted(pages)
+
+
+def parse_chunk_size(chunk_input):
+    """Parse and validate chunk size input."""
+    try:
+        chunk_size = int(chunk_input)
+        if chunk_size <= 0:
+            raise ValueError("Chunk size must be a positive integer.")
+        return chunk_size
+    except ValueError:
+        raise ValueError("Chunk size must be a positive integer.")
+
+
+def check_overwrite_single_file(output_path, parsed_input=None):
+    """Check if a single output file exists."""
+    return output_path and os.path.exists(output_path)
+
+
+def check_overwrite_split_files(output_path, parsed_input=None):
+    """Check if any split output files would be overwritten."""
+    if not output_path:
+        return False
+    
+    output_file = Path(output_path)
+    base_name = output_file.stem
+    output_dir = output_file.parent
+    
+    # Check if part1 exists as a simple overwrite check
+    first_file = output_dir / f"{base_name}_part1.pdf"
+    return first_file.exists()
+
+
+def check_overwrite_image_files(output_path, parsed_input):
+    """Check if any image output files would be overwritten.
+    
+    Args:
+        output_path: Path template for output files
+        parsed_input: List of page numbers to convert
+    """
+    if not output_path:
+        return False
+    
+    output_file = Path(output_path)
+    base_name = output_file.stem
+    output_dir = output_file.parent
+    
+    # Check if any of the image files exist
+    for page_num in parsed_input:
+        image_file = output_dir / f"{base_name}_page{page_num}.png"
+        if image_file.exists():
+            return True
+    
+    return False
 
 
 def trim_pdf(input_path, page_numbers, output_path):
@@ -200,7 +255,9 @@ class PDFPageSelectorApp(QMainWindow):
                 section_title="Page Ranges",
                 placeholder="e.g., 1-3,5,6-9,11",
                 help_text="Examples: 1-3,5,6-9,11  or  1,3,5  or  10-20",
-                process_func=self._process_selection,
+                core_func=trim_pdf,
+                parse_input_func=parse_page_ranges,
+                check_overwrite_func=check_overwrite_single_file,
                 output_suffix="_trimmed"
             ),
             Mode(
@@ -209,7 +266,9 @@ class PDFPageSelectorApp(QMainWindow):
                 section_title="Chunk Size",
                 placeholder="e.g., 10",
                 help_text="Number of pages per file (greater than 0)",
-                process_func=self._process_split,
+                core_func=split_pdf,
+                parse_input_func=parse_chunk_size,
+                check_overwrite_func=check_overwrite_split_files,
                 output_suffix="_split"
             ),
             Mode(
@@ -218,7 +277,9 @@ class PDFPageSelectorApp(QMainWindow):
                 section_title="Page Ranges",
                 placeholder="e.g., 1-3,5,6-9,11",
                 help_text="Examples: 1-3,5,6-9,11  or  1,3,5  or  10-20",
-                process_func=self._process_image,
+                core_func=convert_to_images,
+                parse_input_func=parse_page_ranges,
+                check_overwrite_func=check_overwrite_image_files,
                 output_suffix="_images"
             )
         ]
@@ -439,81 +500,28 @@ class PDFPageSelectorApp(QMainWindow):
         QApplication.processEvents()
         
         try:
-            # Use the current mode's process function
-            self.current_mode.process_func(page_input)
+            # Validate output path
+            self._ensure_output_path()
+            
+            # Parse/validate input using mode-specific parser
+            try:
+                parsed_input = self.current_mode.parse_input_func(page_input)
+            except (ValueError, AttributeError) as e:
+                raise ValueError(f"Invalid input:\n{str(e)}")
+            
+            # Check for file overwrites using mode-specific checker
+            if self.current_mode.check_overwrite_func(self.output_path, parsed_input):
+                if not self._confirm_overwrite():
+                    return
+            
+            # Execute the core PDF manipulation function
+            message = self.current_mode.core_func(self.input_path, parsed_input, self.output_path)
+            self._show_success(message)
+            
         except Exception as e:
             self.status_label.setText("Failed")
             self.status_label.setStyleSheet("color: #f44336;")
             QMessageBox.critical(self, "Error", str(e))
-    
-    def _process_selection(self, page_input):
-        """Process PDF in selection mode."""
-        self._ensure_output_path()
-        try:
-            page_numbers = parse_page_ranges(page_input)
-        except (ValueError, AttributeError) as e:
-            raise ValueError(f"Invalid page format:\n{str(e)}")
-        
-        if self.output_path and os.path.exists(self.output_path):
-            if not self._confirm_overwrite():
-                return
-        
-        message = trim_pdf(self.input_path, page_numbers, self.output_path)
-        self._show_success(message)
-    
-    def _process_split(self, chunk_input):
-        """Process PDF in split mode."""
-        self._ensure_output_path()
-        try:
-            chunk_size = int(chunk_input)
-            if chunk_size <= 0:
-                raise ValueError("Chunk size must be a positive integer.")
-        except ValueError:
-            raise ValueError("Chunk size must be a positive integer.")
-        
-        # Check if any output files would be overwritten
-        if self.output_path:
-            output_file = Path(self.output_path)
-            base_name = output_file.stem
-            output_dir = output_file.parent
-            
-            # Check if part1 exists as a simple overwrite check
-            first_file = output_dir / f"{base_name}_part1.pdf"
-            if first_file.exists():
-                if not self._confirm_overwrite():
-                    return
-        
-        message = split_pdf(self.input_path, chunk_size, self.output_path)
-        self._show_success(message)
-    
-    def _process_image(self, page_input):
-        """Process PDF in image mode."""
-        self._ensure_output_path()
-        try:
-            page_numbers = parse_page_ranges(page_input)
-        except (ValueError, AttributeError) as e:
-            raise ValueError(f"Invalid page format:\n{str(e)}")
-        
-        # Check if any output files would be overwritten
-        if self.output_path:
-            output_file = Path(self.output_path)
-            base_name = output_file.stem
-            output_dir = output_file.parent
-            
-            # Check if any of the image files exist
-            files_exist = False
-            for page_num in page_numbers:
-                image_file = output_dir / f"{base_name}_page{page_num}.png"
-                if image_file.exists():
-                    files_exist = True
-                    break
-            
-            if files_exist:
-                if not self._confirm_overwrite():
-                    return
-        
-        message = convert_to_images(self.input_path, page_numbers, self.output_path)
-        self._show_success(message)
     
     def _confirm_overwrite(self):
         """Ask user to confirm file overwrite."""
