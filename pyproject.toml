@@ -1,0 +1,45 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pdf-page-selector"
+version = "1.0.0"
+description = "A simple desktop application for working with PDF files"
+readme = "README.md"
+requires-python = ">=3.8"
+license = {text = "MIT"}
+authors = [
+    {name = "kelltom"}
+]
+keywords = ["pdf", "pyqt6", "gui", "pdf-tools"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: End Users/Desktop",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+
+dependencies = [
+    "altgraph==0.17.4",
+    "darkdetect==0.8.0",
+    "packaging==25.0",
+    "pefile==2023.2.7",
+    "pyinstaller==6.16.0",
+    "pyinstaller-hooks-contrib==2025.9",
+    "PyMuPDF>=1.25.2",
+    "PyQt6==6.10.0",
+    "PyQt6-Qt6==6.10.0",
+    "PyQt6-sip==13.10.2",
+    "pywin32-ctypes==0.2.3",
+    "setuptools==80.9.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/kelltom/pdf-page-selector"
+Repository = "https://github.com/kelltom/pdf-page-selector.git"
+Issues = "https://github.com/kelltom/pdf-page-selector/issues"
