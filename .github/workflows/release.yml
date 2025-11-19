@@ -64,3 +64,5 @@ jobs:
           Releases/*-Portable.zip
           Releases/RELEASES
           Releases/*.nupkg
+          Releases/releases.win.json
+          Releases/assets.win.json
