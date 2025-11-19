@@ -1,14 +1,15 @@
 import os
 import sys
-from pathlib import Path
+import fitz  # PyMuPDF
+import velopack
 
+from pathlib import Path
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                              QHBoxLayout, QLabel, QPushButton, QLineEdit, 
                              QFileDialog, QMessageBox, QGroupBox, QRadioButton, 
-                             QButtonGroup)
+                             QButtonGroup, QMenu)
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QFont
-import fitz  # PyMuPDF
+from PyQt6.QtGui import QFont, QAction
 
 
 class Mode:
@@ -248,6 +249,37 @@ def convert_to_images(input_path, page_numbers, output_path):
     return message
 
 
+def update_app():
+    """Check for updates and apply them if available."""
+    try:
+        # Check for updates from GitHub releases
+        # GitHub Actions will upload release files to the latest release
+        manager = velopack.UpdateManager("https://github.com/kelltom/pdf-page-selector/releases/latest/download/")
+        update_info = manager.check_for_updates()
+        
+        if not update_info:
+            QMessageBox.information(None, "No Updates", "You're running the latest version!")
+            return  # no updates available
+        
+        # Ask user if they want to update
+        reply = QMessageBox.question(
+            None, "Update Available",
+            f"A new version is available. Would you like to download and install it?\n\nThis will restart the application.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        )
+        
+        if reply == QMessageBox.StandardButton.Yes:
+            # Download the updates
+            manager.download_updates(update_info)
+            
+            # Apply the update and restart the app
+            manager.apply_updates_and_restart(update_info)
+    except Exception as e:
+        # Only show error if it's not the "NotInstalled" development mode error
+        if "NotInstalled" not in str(e):
+            QMessageBox.warning(None, "Update Error", f"Could not check for updates:\n{str(e)}")
+
+
 class PDFPageSelectorApp(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -302,6 +334,9 @@ class PDFPageSelectorApp(QMainWindow):
         self.resize(400, 580)
         self.setStyleSheet(load_stylesheet())
         
+        # Create menu bar
+        self._create_menu_bar()
+        
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
         layout = QVBoxLayout(central_widget)
@@ -343,6 +378,18 @@ class PDFPageSelectorApp(QMainWindow):
         layout.addWidget(self.status_label)
         
         layout.addStretch()
+    
+    def _create_menu_bar(self):
+        """Create the application menu bar."""
+        menubar = self.menuBar()
+        
+        # Help menu
+        help_menu = menubar.addMenu("Help")
+        
+        # Check for Updates action
+        update_action = QAction("Check for Updates", self)
+        update_action.triggered.connect(update_app)
+        help_menu.addAction(update_action)
     
     def _create_input_section(self):
         group = QGroupBox("Input PDF")
@@ -564,6 +611,9 @@ class PDFPageSelectorApp(QMainWindow):
 
 
 if __name__ == "__main__":
+    # Velopack needs to run first - it may quit/restart the process
+    velopack.App().run()
+    
     app = QApplication(sys.argv)
     window = PDFPageSelectorApp()
     window.show()

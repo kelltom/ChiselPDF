@@ -1,0 +1,99 @@
+name: Build and Release
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
+
+jobs:
+  build-and-release:
+    runs-on: windows-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e ".[dev]"
+    
+    - name: Build with PyInstaller
+      run: |
+        pyinstaller --onefile --windowed --name "PDF-Page-Selector" --add-data "style.qss;." main.py
+    
+    - name: Set up .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '8.0.x'
+    
+    - name: Install vpk
+      run: dotnet tool install -g vpk
+    
+    - name: Generate version number
+      id: version
+      run: |
+        $version = "1.0.${{ github.run_number }}"
+        echo "VERSION=$version" >> $env:GITHUB_OUTPUT
+        echo "Version: $version"
+    
+    - name: Package with Velopack
+      run: |
+        vpk pack --packId kelltom.pdfpageselector --packVersion ${{ steps.version.outputs.VERSION }} --packDir .\dist --mainExe PDF-Page-Selector.exe
+    
+    - name: Create Release
+      id: create_release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: v${{ steps.version.outputs.VERSION }}
+        release_name: Release v${{ steps.version.outputs.VERSION }}
+        draft: false
+        prerelease: false
+    
+    - name: Upload Release Assets
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./Releases/kelltom.pdfpageselector-${{ steps.version.outputs.VERSION }}-win-Setup.exe
+        asset_name: PDF-Page-Selector-Setup.exe
+        asset_content_type: application/octet-stream
+    
+    - name: Upload RELEASES file
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./Releases/RELEASES
+        asset_name: RELEASES
+        asset_content_type: text/plain
+    
+    - name: Upload nupkg file
+      run: |
+        $nupkg = Get-ChildItem -Path .\Releases\*.nupkg | Select-Object -First 1
+        if ($nupkg) {
+          echo "NUPKG_PATH=$($nupkg.FullName)" >> $env:GITHUB_OUTPUT
+          echo "NUPKG_NAME=$($nupkg.Name)" >> $env:GITHUB_OUTPUT
+        }
+      id: find_nupkg
+    
+    - name: Upload nupkg to release
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ${{ steps.find_nupkg.outputs.NUPKG_PATH }}
+        asset_name: ${{ steps.find_nupkg.outputs.NUPKG_NAME }}
+        asset_content_type: application/octet-stream
