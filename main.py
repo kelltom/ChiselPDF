@@ -250,7 +250,7 @@ def update_app():
     try:
         # Check for updates from GitHub releases
         # Point to the latest release download URL
-        manager = velopack.UpdateManager("https://github.com/kelltom/ChiselPDF/releases/latest/download/releases.win.json")
+        manager = velopack.UpdateManager("https://github.com/kelltom/ChiselPDF/releases/latest/download/")
         update_info = manager.check_for_updates()
         
         if not update_info:
