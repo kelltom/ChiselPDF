@@ -52,38 +52,7 @@ jobs:
       run: |
         vpk pack --packId kelltom.pdfpageselector --packVersion ${{ steps.version.outputs.VERSION }} --packDir .\dist --mainExe PDF-Page-Selector.exe
     
-    - name: Create Release
-      id: create_release
-      uses: actions/create-release@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        tag_name: v${{ steps.version.outputs.VERSION }}
-        release_name: Release v${{ steps.version.outputs.VERSION }}
-        draft: false
-        prerelease: false
-    
-    - name: Upload Release Assets
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./Releases/kelltom.pdfpageselector-${{ steps.version.outputs.VERSION }}-win-Setup.exe
-        asset_name: PDF-Page-Selector-Setup.exe
-        asset_content_type: application/octet-stream
-    
-    - name: Upload RELEASES file
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./Releases/RELEASES
-        asset_name: RELEASES
-        asset_content_type: text/plain
-    
-    - name: Upload nupkg file
+    - name: Find nupkg file
       run: |
         $nupkg = Get-ChildItem -Path .\Releases\*.nupkg | Select-Object -First 1
         if ($nupkg) {
@@ -92,12 +61,14 @@ jobs:
         }
       id: find_nupkg
     
-    - name: Upload nupkg to release
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    - name: Create Release and Upload Assets
+      uses: softprops/action-gh-release@v1
       with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ${{ steps.find_nupkg.outputs.NUPKG_PATH }}
-        asset_name: ${{ steps.find_nupkg.outputs.NUPKG_NAME }}
-        asset_content_type: application/octet-stream
+        tag_name: v${{ steps.version.outputs.VERSION }}
+        name: Release v${{ steps.version.outputs.VERSION }}
+        draft: false
+        prerelease: false
+        files: |
+          ./Releases/kelltom.pdfpageselector-${{ steps.version.outputs.VERSION }}-win-Setup.exe
+          ./Releases/RELEASES
+          ${{ steps.find_nupkg.outputs.NUPKG_PATH }}
