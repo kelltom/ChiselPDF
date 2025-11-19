@@ -38,9 +38,6 @@ jobs:
       with:
         dotnet-version: '8.0.x'
     
-    - name: Install vpk
-      run: dotnet tool install -g vpk
-    
     - name: Generate version number
       id: version
       run: |
@@ -48,21 +45,9 @@ jobs:
         echo "VERSION=$version" >> $env:GITHUB_OUTPUT
         echo "Version: $version"
     
-    - name: Package with Velopack
+    - name: Create Velopack Release
       run: |
+        dotnet tool install -g vpk
+        vpk download github --repoUrl https://github.com/${{ github.repository }} --token ${{ secrets.GITHUB_TOKEN }}
         vpk pack --packId ChiselPDF --packVersion ${{ steps.version.outputs.VERSION }} --packDir .\dist --mainExe ChiselPDF.exe
-    
-    - name: Create Release and Upload Assets
-      uses: softprops/action-gh-release@v1
-      with:
-        tag_name: v${{ steps.version.outputs.VERSION }}
-        name: Release v${{ steps.version.outputs.VERSION }}
-        draft: false
-        prerelease: false
-        files: |
-          Releases/*-Setup.exe
-          Releases/*-Portable.zip
-          Releases/RELEASES
-          Releases/*.nupkg
-          Releases/releases.win.json
-          Releases/assets.win.json
+        vpk upload github --repoUrl https://github.com/${{ github.repository }} --publish --releaseName "ChiselPDF ${{ steps.version.outputs.VERSION }}" --tag v${{ steps.version.outputs.VERSION }} --token ${{ secrets.GITHUB_TOKEN }}
