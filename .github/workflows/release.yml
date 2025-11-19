@@ -52,31 +52,6 @@ jobs:
       run: |
         vpk pack --packId kelltom.pdfpageselector --packVersion ${{ steps.version.outputs.VERSION }} --packDir .\dist --mainExe PDF-Page-Selector.exe
     
-    - name: List Release Files
-      run: |
-        Write-Host "Contents of Releases folder:"
-        Get-ChildItem -Path .\Releases -Recurse | ForEach-Object { Write-Host $_.FullName }
-    
-    - name: Find release files
-      run: |
-        $setupExe = Get-ChildItem -Path .\Releases\*-Setup.exe -Recurse | Select-Object -First 1
-        $nupkg = Get-ChildItem -Path .\Releases\*.nupkg -Recurse | Select-Object -First 1
-        $releases = Get-ChildItem -Path .\Releases\RELEASES -Recurse | Select-Object -First 1
-        
-        if ($setupExe) {
-          echo "SETUP_PATH=$($setupExe.FullName)" >> $env:GITHUB_OUTPUT
-          Write-Host "Found setup: $($setupExe.FullName)"
-        }
-        if ($nupkg) {
-          echo "NUPKG_PATH=$($nupkg.FullName)" >> $env:GITHUB_OUTPUT
-          Write-Host "Found nupkg: $($nupkg.FullName)"
-        }
-        if ($releases) {
-          echo "RELEASES_PATH=$($releases.FullName)" >> $env:GITHUB_OUTPUT
-          Write-Host "Found RELEASES: $($releases.FullName)"
-        }
-      id: find_files
-    
     - name: Create Release and Upload Assets
       uses: softprops/action-gh-release@v1
       with:
@@ -85,6 +60,6 @@ jobs:
         draft: false
         prerelease: false
         files: |
-          ${{ steps.find_files.outputs.SETUP_PATH }}
-          ${{ steps.find_files.outputs.RELEASES_PATH }}
-          ${{ steps.find_files.outputs.NUPKG_PATH }}
+          Releases/*-Setup.exe
+          Releases/RELEASES
+          Releases/*.nupkg
