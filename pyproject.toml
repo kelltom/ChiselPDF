@@ -33,7 +33,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "pyinstaller>=6.16.0",
-    "velopack>=0.0.1369",
+    "velopack>=0.0.1369.dev7516",
 ]
 
 [project.urls]
