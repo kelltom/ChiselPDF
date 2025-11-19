@@ -325,7 +325,7 @@ class PDFPageSelectorApp(QMainWindow):
         self.init_ui()
         
     def init_ui(self):
-        self.setWindowTitle("ChiselPDF 2")
+        self.setWindowTitle("ChiselPDF")
         self.setMinimumSize(400, 580)
         self.resize(400, 580)
         self.setStyleSheet(load_stylesheet())
