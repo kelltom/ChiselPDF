@@ -16,7 +16,8 @@ class Mode:
     """Represents a PDF processing mode with all associated metadata."""
     
     def __init__(self, name, display_name, section_title, placeholder, help_text, 
-                 core_func, parse_input_func, check_overwrite_func, output_suffix):
+                 core_func, parse_input_func, check_overwrite_func,
+                 suffix, extension, is_multi_file):
         self.name = name
         self.display_name = display_name
         self.section_title = section_title
@@ -25,7 +26,21 @@ class Mode:
         self.core_func = core_func  # The actual PDF manipulation function
         self.parse_input_func = parse_input_func  # Function to parse/validate user input
         self.check_overwrite_func = check_overwrite_func  # Function to check if files exist
-        self.output_suffix = output_suffix
+        self.suffix = suffix  # Suffix for output files (e.g., "trimmed", "split_part", "img_page")
+        self.extension = extension  # File extension (e.g., "pdf", "png")
+        self.is_multi_file = is_multi_file  # Whether mode creates multiple files
+    
+    def get_single_filename(self, base_name):
+        """Generate filename for single-file output."""
+        return f"{base_name}_{self.suffix}.{self.extension}"
+    
+    def get_multi_pattern(self, base_name):
+        """Generate pattern for multi-file output preview."""
+        return f"{base_name}_{self.suffix}*.{self.extension}"
+    
+    def get_multi_glob_pattern(self, base_name):
+        """Generate glob pattern for finding existing multi-file outputs."""
+        return f"{base_name}_{self.suffix}*.{self.extension}"
 
 
 def resource_path(relative_path):
@@ -77,50 +92,51 @@ def parse_chunk_size(chunk_input):
         raise ValueError("Chunk size must be a positive integer.") from e
 
 
-def check_overwrite_single_file(output_path, parsed_input=None):
-    """Check if a single output file exists."""
-    return output_path and os.path.exists(output_path)
-
-
-def check_overwrite_split_files(output_path, parsed_input=None):
-    """Check if any split output files would be overwritten."""
-    if not output_path:
-        return False
-    
-    output_file = Path(output_path)
-    base_name = output_file.stem
-    output_dir = output_file.parent
-    
-    # Check if part1 exists as a simple overwrite check
-    first_file = output_dir / f"{base_name}_part1.pdf"
-    return first_file.exists()
-
-
-def check_overwrite_image_files(output_path, parsed_input):
-    """Check if any image output files would be overwritten.
+def check_overwrite_single_file(output_folder, base_name, mode, parsed_input=None):
+    """Check if a single output file exists.
     
     Args:
-        output_path: Path template for output files
-        parsed_input: List of page numbers to convert
+        output_folder: Destination folder path
+        base_name: Base filename without suffix/extension
+        mode: Mode object with suffix and extension
+        parsed_input: Parsed input (not used, for signature compatibility)
     """
-    if not output_path:
+    if not output_folder or not base_name:
         return False
     
-    output_file = Path(output_path)
-    base_name = output_file.stem
-    output_dir = output_file.parent
-    
-    # Check if any of the image files exist
-    for page_num in parsed_input:
-        image_file = output_dir / f"{base_name}_page{page_num}.png"
-        if image_file.exists():
-            return True
-    
-    return False
+    filename = mode.get_single_filename(base_name)
+    full_path = Path(output_folder) / filename
+    return full_path.exists()
 
 
-def trim_pdf(input_path, page_numbers, output_path):
-    """Create a new PDF with only the specified pages."""
+def check_overwrite_multi_files(output_folder, base_name, mode, parsed_input=None):
+    """Check if any multi-file output files would be overwritten.
+    
+    Args:
+        output_folder: Destination folder path
+        base_name: Base filename without suffix/extension
+        mode: Mode object with suffix and extension
+        parsed_input: Parsed input (not used, for signature compatibility)
+    """
+    if not output_folder or not base_name:
+        return False
+    
+    output_dir = Path(output_folder)
+    pattern = mode.get_multi_glob_pattern(base_name)
+    matching_files = list(output_dir.glob(pattern))
+    return len(matching_files) > 0
+
+
+def trim_pdf(input_path, page_numbers, output_folder, base_name, mode):
+    """Create a new PDF with only the specified pages.
+    
+    Args:
+        input_path: Source PDF path
+        page_numbers: List of page numbers to include
+        output_folder: Destination folder
+        base_name: Base filename without suffix/extension
+        mode: Mode object with suffix and extension
+    """
     doc = fitz.open(input_path)
     total_pages = len(doc)
     
@@ -142,7 +158,11 @@ def trim_pdf(input_path, page_numbers, output_path):
     for page_num in valid_pages:
         new_doc.insert_pdf(doc, from_page=page_num - 1, to_page=page_num - 1)
     
-    new_doc.save(output_path)
+    # Build output path from folder and base name
+    filename = mode.get_single_filename(base_name)
+    output_path = Path(output_folder) / filename
+    
+    new_doc.save(str(output_path))
     new_doc.close()
     doc.close()
     
@@ -153,8 +173,16 @@ def trim_pdf(input_path, page_numbers, output_path):
     return message
 
 
-def split_pdf(input_path, chunk_size, output_path):
-    """Split a PDF into multiple files with specified chunk size."""
+def split_pdf(input_path, chunk_size, output_folder, base_name, mode):
+    """Split a PDF into multiple files with specified chunk size.
+    
+    Args:
+        input_path: Source PDF path
+        chunk_size: Number of pages per output file
+        output_folder: Destination folder
+        base_name: Base filename without suffix/extension
+        mode: Mode object with suffix and extension
+    """
     doc = fitz.open(input_path)
     total_pages = len(doc)
 
@@ -162,10 +190,7 @@ def split_pdf(input_path, chunk_size, output_path):
         doc.close()
         raise ValueError("Chunk size must be a positive integer.")
 
-    # Determine output naming
-    output_file = Path(output_path)
-    base_name = output_file.stem
-    output_dir = output_file.parent
+    output_dir = Path(output_folder)
 
     created_files = []
     for chunk_num, start_page in enumerate(range(0, total_pages, chunk_size), start=1):
@@ -175,8 +200,8 @@ def split_pdf(input_path, chunk_size, output_path):
         new_doc = fitz.open()
         new_doc.insert_pdf(doc, from_page=start_page, to_page=end_page - 1)
 
-        # Generate output filename
-        output_filename = output_dir / f"{base_name}_part{chunk_num}.pdf"
+        # Generate output filename using base_name and suffix
+        output_filename = output_dir / f"{base_name}_{mode.suffix}{chunk_num}.{mode.extension}"
         new_doc.save(str(output_filename))
         new_doc.close()
 
@@ -190,8 +215,16 @@ def split_pdf(input_path, chunk_size, output_path):
     return message
 
 
-def convert_to_images(input_path, page_numbers, output_path):
-    """Convert specified PDF pages to images."""
+def convert_to_images(input_path, page_numbers, output_folder, base_name, mode):
+    """Convert specified PDF pages to images.
+    
+    Args:
+        input_path: Source PDF path
+        page_numbers: List of page numbers to convert
+        output_folder: Destination folder
+        base_name: Base filename without suffix/extension
+        mode: Mode object with suffix and extension
+    """
     doc = fitz.open(input_path)
     total_pages = len(doc)
     
@@ -209,10 +242,7 @@ def convert_to_images(input_path, page_numbers, output_path):
         doc.close()
         raise ValueError("No valid pages to convert to images.")
     
-    # Determine output naming
-    output_file = Path(output_path)
-    base_name = output_file.stem
-    output_dir = output_file.parent
+    output_dir = Path(output_folder)
     
     # Ensure output directory exists
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -227,8 +257,8 @@ def convert_to_images(input_path, page_numbers, output_path):
         # Render page to an image (pixmap)
         pix = page.get_pixmap(matrix=fitz.Matrix(2, 2))  # 2x scaling for better quality
         
-        # Generate output filename
-        output_filename = output_dir / f"{base_name}_page{page_num}.png"
+        # Generate output filename using base_name and suffix
+        output_filename = output_dir / f"{base_name}_{mode.suffix}{page_num}.{mode.extension}"
         pix.save(str(output_filename))
         created_files.append(str(output_filename))
     
@@ -280,7 +310,7 @@ class PDFPageSelectorApp(QMainWindow):
     def __init__(self):
         super().__init__()
         self.input_path = None
-        self.output_path = None
+        self.output_folder = None  # Store only the destination folder
         
         # Define available modes
         self.modes = [
@@ -293,7 +323,9 @@ class PDFPageSelectorApp(QMainWindow):
                 core_func=trim_pdf,
                 parse_input_func=parse_page_ranges,
                 check_overwrite_func=check_overwrite_single_file,
-                output_suffix="_trimmed"
+                suffix="trimmed",
+                extension="pdf",
+                is_multi_file=False
             ),
             Mode(
                 name="split",
@@ -303,8 +335,10 @@ class PDFPageSelectorApp(QMainWindow):
                 help_text="Number of pages per file (greater than 0)",
                 core_func=split_pdf,
                 parse_input_func=parse_chunk_size,
-                check_overwrite_func=check_overwrite_split_files,
-                output_suffix="_split"
+                check_overwrite_func=check_overwrite_multi_files,
+                suffix="split_part",
+                extension="pdf",
+                is_multi_file=True
             ),
             Mode(
                 name="image",
@@ -314,8 +348,10 @@ class PDFPageSelectorApp(QMainWindow):
                 help_text="Examples: 1-3,5,6-9,11  or  1,3,5  or  10-20",
                 core_func=convert_to_images,
                 parse_input_func=parse_page_ranges,
-                check_overwrite_func=check_overwrite_image_files,
-                output_suffix="_images"
+                check_overwrite_func=check_overwrite_multi_files,
+                suffix="img_page",
+                extension="png",
+                is_multi_file=True
             )
         ]
         
@@ -456,7 +492,7 @@ class PDFPageSelectorApp(QMainWindow):
         self.page_entry.clear()
     
     def _create_output_section(self):
-        group = QGroupBox("Output PDF")
+        group = QGroupBox("Output")
         layout = QVBoxLayout()
         
         row = QHBoxLayout()
@@ -481,6 +517,23 @@ class PDFPageSelectorApp(QMainWindow):
         color = "#ffffff" if active else "#888888"
         label.setStyleSheet(f"color: {color}; padding: 5px;")
     
+    def _get_base_name(self):
+        """Get base filename from input path."""
+        return Path(self.input_path).stem if self.input_path else "output"
+    
+    def _get_preview_path(self):
+        """Generate preview path for UI display."""
+        if not self.output_folder:
+            return None
+        
+        base_name = self._get_base_name()
+        if self.current_mode.is_multi_file:
+            filename = self.current_mode.get_multi_pattern(base_name)
+        else:
+            filename = self.current_mode.get_single_filename(base_name)
+        
+        return str(Path(self.output_folder) / filename)
+    
     def _on_mode_changed(self, checked, mode):
         """Handle mode radio button changes."""
         if checked:
@@ -489,14 +542,22 @@ class PDFPageSelectorApp(QMainWindow):
             self._update_output_suggestion()
     
     def _update_output_suggestion(self):
-        """Update the output path suggestion based on mode and input."""
+        """Update the output folder suggestion based on input."""
         if not self.input_path:
             return
         
+        # Set output folder to same directory as input
         input_file = Path(self.input_path)
-        self.output_path = str(input_file.parent / f"{input_file.stem}{self.current_mode.output_suffix}.pdf")
+        self.output_folder = str(input_file.parent)
         
-        self._update_label(self.output_label, self.output_path, active=True)
+        self._update_output_preview()
+    
+    def _update_output_preview(self):
+        """Update the output label to show preview."""
+        if preview_path := self._get_preview_path():
+            self._update_label(self.output_label, preview_path, active=True)
+        else:
+            self._update_label(self.output_label, "No output location selected")
     
     def _get_pdf_page_count(self, filename):
         """Get the total number of pages in a PDF file."""
@@ -537,17 +598,13 @@ class PDFPageSelectorApp(QMainWindow):
     def browse_output(self):
         if self.input_path:
             input_file = Path(self.input_path)
-            initial = f"{input_file.parent}/{input_file.stem}{self.current_mode.output_suffix}.pdf"
+            initial_dir = str(input_file.parent)
         else:
-            initial = str(Path.home() / "output_trimmed.pdf")
+            initial_dir = str(Path.home())
         
-        filename, _ = QFileDialog.getSaveFileName(
-            self, "Save Trimmed PDF As", initial, "PDF files (*.pdf);;All files (*.*)"
-        )
-        
-        if filename:
-            self.output_path = filename
-            self._update_label(self.output_label, filename, active=True)
+        if folder := QFileDialog.getExistingDirectory(self, "Select Output Folder", initial_dir):
+            self.output_folder = folder
+            self._update_output_preview()
     
     def process_pdf(self):
         page_input = self.page_entry.text().strip()
@@ -562,8 +619,8 @@ class PDFPageSelectorApp(QMainWindow):
         QApplication.processEvents()
 
         try:
-            # Validate output path
-            self._ensure_output_path()
+            # Validate output folder
+            self._ensure_output_folder()
 
             # Parse/validate input using mode-specific parser
             try:
@@ -571,12 +628,15 @@ class PDFPageSelectorApp(QMainWindow):
             except (ValueError, AttributeError) as e:
                 raise ValueError(f"Invalid input:\n{str(e)}") from e
 
+            # Get base name for output files
+            base_name = self._get_base_name()
+
             # Check for file overwrites using mode-specific checker
-            if self.current_mode.check_overwrite_func(self.output_path, parsed_input) and not self._confirm_overwrite():
+            if self.current_mode.check_overwrite_func(self.output_folder, base_name, self.current_mode, parsed_input) and not self._confirm_overwrite():
                 return
 
             # Execute the core PDF manipulation function
-            message = self.current_mode.core_func(self.input_path, parsed_input, self.output_path)
+            message = self.current_mode.core_func(self.input_path, parsed_input, self.output_folder, base_name, self.current_mode)
             self._show_success(message)
 
         except Exception as e:
@@ -595,25 +655,28 @@ class PDFPageSelectorApp(QMainWindow):
     
     def _show_success(self, message):
         """Display success message."""
-        output_dir = Path(self.output_path).parent if self.output_path else ""
-        self.status_label.setText(f"Success! Saved to: {output_dir}")
+        self.status_label.setText(f"Success! Saved to: {self.output_folder}")
         self.status_label.setStyleSheet("color: #4caf50;")
         QMessageBox.information(self, "Success", message)
 
-    def _ensure_output_path(self):
-        """Validate the output path before writing files."""
-        if not self.output_path:
+    def _ensure_output_folder(self):
+        """Validate the output folder before writing files."""
+        if not self.output_folder:
             raise ValueError("Please choose an output location before processing.")
 
         if not self.input_path:
             return
 
         input_path = Path(self.input_path).resolve()
-        output_path = Path(self.output_path).resolve()
-
-        # Prevent overwriting the source file, which can corrupt the PDF while reading.
-        if input_path == output_path:
-            raise ValueError("Output file must be different from the input file.")
+        output_folder = Path(self.output_folder).resolve()
+        
+        # Check if single-file output would overwrite input
+        if not self.current_mode.is_multi_file:
+            base_name = self._get_base_name()
+            filename = self.current_mode.get_single_filename(base_name)
+            potential_output = output_folder / filename
+            if input_path == potential_output:
+                raise ValueError("Output file must be different from the input file.")
 
 
 if __name__ == "__main__":
