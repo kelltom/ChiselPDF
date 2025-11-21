@@ -362,8 +362,8 @@ class PDFPageSelectorApp(QMainWindow):
         
     def init_ui(self):
         self.setWindowTitle("ChiselPDF Demo")
-        self.setMinimumSize(400, 580)
-        self.resize(400, 580)
+        self.setMinimumSize(400, 600)
+        self.resize(400, 600)
         self.setStyleSheet(load_stylesheet())
         
         # Create menu bar
