@@ -306,7 +306,7 @@ def update_app():
             QMessageBox.warning(None, "Update Error", f"Could not check for updates:\n{str(e)}")
 
 
-class PDFPageSelectorApp(QMainWindow):
+class MainApp(QMainWindow):
     def __init__(self):
         super().__init__()
         self.input_path = None
@@ -684,6 +684,6 @@ if __name__ == "__main__":
     velopack.App().run()  # type: ignore[attr-defined]
     
     app = QApplication(sys.argv)
-    window = PDFPageSelectorApp()
+    window = MainApp()
     window.show()
     sys.exit(app.exec())
