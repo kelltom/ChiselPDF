@@ -657,7 +657,44 @@ class MainApp(QMainWindow):
         """Display success message."""
         self.status_label.setText(f"Success! Saved to: {self.output_folder}")
         self.status_label.setStyleSheet("color: #4caf50;")
-        QMessageBox.information(self, "Success", message)
+        
+        # Create custom message box with "Open Folder" button
+        msg_box = QMessageBox(self)
+        msg_box.setWindowTitle("Success")
+        msg_box.setText(message)
+        msg_box.setIcon(QMessageBox.Icon.Information)
+        
+        # Add standard OK button
+        msg_box.addButton(QMessageBox.StandardButton.Ok)
+        
+        # Add custom "Open Folder" button
+        open_folder_btn = msg_box.addButton("Open Folder", QMessageBox.ButtonRole.ActionRole)
+        
+        msg_box.exec()
+        
+        # Check if user clicked "Open Folder"
+        if msg_box.clickedButton() == open_folder_btn:
+            self._open_output_folder()
+    
+    def _open_output_folder(self):
+        """Open the output folder in the system file explorer."""
+        if not self.output_folder:
+            return
+        
+        import subprocess
+        import platform
+        
+        folder_path = str(Path(self.output_folder).resolve())
+        
+        try:
+            if platform.system() == "Windows":
+                os.startfile(folder_path)
+            elif platform.system() == "Darwin":  # macOS
+                subprocess.run(["open", folder_path], check=True)
+            else:  # Linux and others
+                subprocess.run(["xdg-open", folder_path], check=True)
+        except Exception as e:
+            QMessageBox.warning(self, "Error", f"Could not open folder:\n{str(e)}")
 
     def _ensure_output_folder(self):
         """Validate the output folder before writing files."""
