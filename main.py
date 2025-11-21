@@ -250,7 +250,7 @@ def update_app():
     try:
         # Check for updates from GitHub releases
         # Point to the latest release download URL
-        manager = velopack.UpdateManager("https://github.com/kelltom/ChiselPDF/releases/latest/download/")
+        manager = velopack.UpdateManager("https://github.com/kelltom/ChiselPDF/releases/latest/download/")  # type: ignore[attr-defined]
         update_info = manager.check_for_updates()
         
         if not update_info:
@@ -378,9 +378,11 @@ class PDFPageSelectorApp(QMainWindow):
     def _create_menu_bar(self):
         """Create the application menu bar."""
         menubar = self.menuBar()
+        assert menubar is not None  # menuBar() always returns QMenuBar in QMainWindow
         
         # Help menu
         help_menu = menubar.addMenu("Help")
+        assert help_menu is not None  # addMenu() always returns QMenu when called with string
         
         # Check for Updates action
         update_action = QAction("Check for Updates", self)
@@ -608,7 +610,7 @@ class PDFPageSelectorApp(QMainWindow):
 
 if __name__ == "__main__":
     # Velopack needs to run first - it may quit/restart the process
-    velopack.App().run()
+    velopack.App().run()  # type: ignore[attr-defined]
     
     app = QApplication(sys.argv)
     window = PDFPageSelectorApp()
