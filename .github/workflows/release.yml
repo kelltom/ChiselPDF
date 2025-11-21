@@ -18,8 +18,6 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-      with:
-        fetch-depth: 0  # Fetch all history for changelog generation
     
     - name: Set up Python
       uses: actions/setup-python@v5
@@ -46,34 +44,6 @@ jobs:
         $version = "1.0.${{ github.run_number }}"
         echo "VERSION=$version" >> $env:GITHUB_OUTPUT
         echo "Version: $version"
-    
-    - name: Generate release notes
-      id: release_notes
-      run: |
-        $tag = "v${{ steps.version.outputs.VERSION }}"
-        
-        # Get the previous tag
-        $previousTag = git describe --tags --abbrev=0 HEAD^ 2>$null
-        
-        if ($previousTag) {
-          # Generate commit log between tags
-          $commits = git log "$previousTag..HEAD" --pretty=format:"- %s (%h)" --no-merges
-        } else {
-          # First release - show recent commits
-          $commits = git log -10 --pretty=format:"- %s (%h)" --no-merges
-        }
-        
-        $releaseNotes = @"
-        ## What's Changed
-        
-        $commits
-        
-        **Full Changelog**: https://github.com/${{ github.repository }}/compare/$previousTag...$tag
-        "@ -replace "`r`n", "`n"
-        
-        # Escape for GitHub Actions
-        $releaseNotes = $releaseNotes -replace '%', '%25' -replace "`n", '%0A' -replace "`r", '%0D'
-        echo "NOTES=$releaseNotes" >> $env:GITHUB_OUTPUT
     
     - name: Create version info file
       run: |
@@ -112,4 +82,4 @@ jobs:
         dotnet tool install -g vpk
         vpk download github --repoUrl https://github.com/${{ github.repository }} --token ${{ secrets.GITHUB_TOKEN }}
         vpk pack --packId ChiselPDF --packVersion ${{ steps.version.outputs.VERSION }} --packDir .\dist\ChiselPDF --mainExe ChiselPDF.exe
-        vpk upload github --repoUrl https://github.com/${{ github.repository }} --publish --releaseName "ChiselPDF ${{ steps.version.outputs.VERSION }}" --tag v${{ steps.version.outputs.VERSION }} --releaseNotes "${{ steps.release_notes.outputs.NOTES }}" --token ${{ secrets.GITHUB_TOKEN }}
+        vpk upload github --repoUrl https://github.com/${{ github.repository }} --publish --releaseName "ChiselPDF ${{ steps.version.outputs.VERSION }}" --tag v${{ steps.version.outputs.VERSION }} --token ${{ secrets.GITHUB_TOKEN }}
