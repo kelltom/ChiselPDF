@@ -431,7 +431,7 @@ class MainApp(QMainWindow):
         
         row = QHBoxLayout()
         self.input_label = QLabel("No file selected")
-        self.input_label.setStyleSheet("color: #888888; padding: 5px;")
+        self.input_label.setProperty("labelState", "inactive")
         self.input_label.setWordWrap(True)
         row.addWidget(self.input_label, 1)
         
@@ -443,7 +443,7 @@ class MainApp(QMainWindow):
         layout.addLayout(row)
         
         self.page_info_label = QLabel("")
-        self.page_info_label.setStyleSheet("color: #aaaaaa; font-size: 10pt;")
+        self.page_info_label.setObjectName("pageInfoLabel")
         layout.addWidget(self.page_info_label)
         
         group.setLayout(layout)
@@ -478,7 +478,7 @@ class MainApp(QMainWindow):
         layout.addWidget(self.page_entry)
         
         self.help_label = QLabel(self.current_mode.help_text)
-        self.help_label.setStyleSheet("color: #aaaaaa; font-size: 9pt;")
+        self.help_label.setObjectName("helpLabel")
         layout.addWidget(self.help_label)
         
         group.setLayout(layout)
@@ -497,7 +497,7 @@ class MainApp(QMainWindow):
         
         row = QHBoxLayout()
         self.output_label = QLabel("No output location selected")
-        self.output_label.setStyleSheet("color: #888888; padding: 5px;")
+        self.output_label.setProperty("labelState", "inactive")
         self.output_label.setWordWrap(True)
         row.addWidget(self.output_label, 1)
         
@@ -514,8 +514,18 @@ class MainApp(QMainWindow):
         """Update a label with truncated text and appropriate styling."""
         display_text = text if len(text) < 80 else f"...{text[-77:]}"
         label.setText(display_text)
-        color = "#ffffff" if active else "#888888"
-        label.setStyleSheet(f"color: {color}; padding: 5px;")
+        # Use dynamic property instead of inline styles
+        label.setProperty("labelState", "active" if active else "inactive")
+        # Force style refresh
+        label.style().unpolish(label)
+        label.style().polish(label)
+    
+    def _set_label_state(self, label, state):
+        """Set a label's state property and refresh styling."""
+        label.setProperty("labelState", state)
+        if style := label.style():
+            style.unpolish(label)
+            style.polish(label)
     
     def _get_base_name(self):
         """Get base filename from input path."""
@@ -615,7 +625,7 @@ class MainApp(QMainWindow):
             return
 
         self.status_label.setText("Processing...")
-        self.status_label.setStyleSheet("color: #aaaaaa;")
+        self._set_label_state(self.status_label, "processing")
         QApplication.processEvents()
 
         try:
@@ -641,7 +651,7 @@ class MainApp(QMainWindow):
 
         except Exception as e:
             self.status_label.setText("Failed")
-            self.status_label.setStyleSheet("color: #f44336;")
+            self._set_label_state(self.status_label, "error")
             QMessageBox.critical(self, "Error", str(e))
     
     def _confirm_overwrite(self):
@@ -656,7 +666,7 @@ class MainApp(QMainWindow):
     def _show_success(self, message):
         """Display success message."""
         self.status_label.setText(f"Success! Saved to: {self.output_folder}")
-        self.status_label.setStyleSheet("color: #4caf50;")
+        self._set_label_state(self.status_label, "success")
         
         # Create custom message box with "Open Folder" button
         msg_box = QMessageBox(self)
