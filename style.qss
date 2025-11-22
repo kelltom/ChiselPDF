@@ -40,14 +40,14 @@ QPushButton:disabled {
     color: #888888;
 }
 QRadioButton::indicator {
-    width: 18px;
-    height: 18px;
+    width: 14px;
+    height: 14px;
     border-radius: 9px;
+    background-color: #555555;
     border: 2px solid #555555;
 }
 QRadioButton::indicator:checked {
-    background-color: #0d47a1;
-    border: 2px solid #0d47a1;
+    background-color: #1565c0;
 }
 QRadioButton::indicator:hover {
     border: 2px solid #1565c0;
