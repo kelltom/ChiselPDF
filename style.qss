@@ -22,7 +22,7 @@ QLineEdit {
     padding: 5px;
 }
 QPushButton {
-    background-color: #0d47a1;
+    background-color: #1b75d0;
     color: #ffffff;
     border: none;
     border-radius: 3px;
@@ -30,10 +30,10 @@ QPushButton {
     font-weight: bold;
 }
 QPushButton:hover {
-    background-color: #1565c0;
+    background-color: #155ca1;
 }
 QPushButton:pressed {
-    background-color: #0a3d91;
+    background-color: #0c3b6a;
 }
 QPushButton:disabled {
     background-color: #555555;
@@ -47,8 +47,8 @@ QRadioButton::indicator {
     border: 2px solid #555555;
 }
 QRadioButton::indicator:checked {
-    background-color: #1565c0;
+    background-color: #1b75d0;
 }
 QRadioButton::indicator:hover {
-    border: 2px solid #1565c0;
+    border: 2px solid #155ca1;
 }
