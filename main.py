@@ -319,7 +319,7 @@ class MainApp(QMainWindow):
                 display_name="Selection",
                 section_title="Page Ranges",
                 placeholder="e.g., 1-3,5,6-9,11",
-                help_text="Examples: 1-3,5,6-9,11  or  1,3,5  or  10-20",
+                help_text="Specify individual pages and/or ranges separated by commas",
                 core_func=trim_pdf,
                 parse_input_func=parse_page_ranges,
                 check_overwrite_func=check_overwrite_single_file,
@@ -345,7 +345,7 @@ class MainApp(QMainWindow):
                 display_name="Image",
                 section_title="Page Ranges",
                 placeholder="e.g., 1-3,5,6-9,11",
-                help_text="Examples: 1-3,5,6-9,11  or  1,3,5  or  10-20",
+                help_text="Specify individual pages and/or ranges separated by commas",
                 core_func=convert_to_images,
                 parse_input_func=parse_page_ranges,
                 check_overwrite_func=check_overwrite_multi_files,
@@ -470,14 +470,14 @@ class MainApp(QMainWindow):
         return group
     
     def _create_page_section(self):
-        group = QGroupBox("Page Ranges")
+        group = QGroupBox(self.current_mode.section_title)
         layout = QVBoxLayout()
         
         self.page_entry = QLineEdit()
-        self.page_entry.setPlaceholderText("e.g., 1-3,5,6-9,11")
+        self.page_entry.setPlaceholderText(self.current_mode.placeholder)
         layout.addWidget(self.page_entry)
         
-        self.help_label = QLabel("Examples: 1-3,5,6-9,11  or  1,3,5  or  10-20")
+        self.help_label = QLabel(self.current_mode.help_text)
         self.help_label.setStyleSheet("color: #aaaaaa; font-size: 9pt;")
         layout.addWidget(self.help_label)
         
